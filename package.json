@@ -1,0 +1,39 @@
+{
+  "name": "roxstar-spin-wheel",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Real-time multiplayer spin wheel game system",
+  "main": "src/server.ts",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "db:generate": "npx prisma generate",
+    "db:push": "npx prisma db push",
+    "db:migrate": "npx prisma migrate dev",
+    "db:seed": "tsx src/seed.ts",
+    "db:reset": "npx prisma db push --force-reset && tsx src/seed.ts",
+    "setup": "npm run db:push && npm run db:generate && npm run db:seed"
+  },
+  "keywords": ["spin-wheel", "real-time", "multiplayer", "game"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.2",
+    "socket.io": "^4.8.3",
+    "sqlite3": "^6.0.1"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/node": "^25.9.1",
+    "prisma": "^6.19.3",
+    "tsx": "^4.22.3",
+    "typescript": "^6.0.3"
+  }
+}

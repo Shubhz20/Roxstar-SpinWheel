@@ -1,0 +1,94 @@
+// Spin Wheel Game System - Database Schema
+// Uses SQLite for development, can be swapped for PostgreSQL in production
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  role      String   @default("user") // "admin" | "user"
+  coins     Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  createdWheels  SpinWheel[]   @relation("WheelCreator")
+  participations Participant[]
+  transactions   Transaction[]
+}
+
+// ─── Spin Wheel ───────────────────────────────────────────────────────────────
+model SpinWheel {
+  id               String   @id @default(uuid())
+  status           String   @default("waiting") // waiting | active | spinning | completed | aborted
+  entryFee         Float
+  winnerPool       Float    @default(0) // Accumulated winner pool
+  adminPool        Float    @default(0) // Accumulated admin/owner pool
+  appPool          Float    @default(0) // Accumulated app pool
+  minParticipants  Int      @default(3)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  startedAt        DateTime?
+  completedAt      DateTime?
+  winnerId         String?
+  eliminationOrder String?  // JSON array of user IDs in elimination order
+
+  // Relations
+  admin        User          @relation("WheelCreator", fields: [adminId], references: [id])
+  adminId      String
+  participants Participant[]
+  transactions Transaction[]
+}
+
+// ─── Participant ──────────────────────────────────────────────────────────────
+model Participant {
+  id           String   @id @default(uuid())
+  status       String   @default("active") // active | eliminated | winner
+  eliminatedAt DateTime?
+  joinedAt     DateTime @default(now())
+
+  // Relations
+  user      User      @relation(fields: [userId], references: [id])
+  userId    String
+  spinWheel SpinWheel @relation(fields: [spinWheelId], references: [id])
+  spinWheelId String
+
+  @@unique([userId, spinWheelId]) // A user can only join a wheel once
+}
+
+// ─── Transaction Ledger ───────────────────────────────────────────────────────
+model Transaction {
+  id          String   @id @default(uuid())
+  type        String   // entry_fee | winner_payout | admin_payout | app_fee | refund
+  amount      Float
+  fromUserId  String?
+  toUserId    String?
+  description String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  user        User      @relation(fields: [userId], references: [id])
+  userId      String
+  spinWheel   SpinWheel @relation(fields: [spinWheelId], references: [id])
+  spinWheelId String
+}
+
+// ─── App Configuration (database-driven) ─────────────────────────────────────
+model AppConfig {
+  id    String @id @default(uuid())
+  key   String @unique
+  value String
+  description String?
+  updatedAt DateTime @updatedAt
+}

@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎡 Roxstar Spin Wheel</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+    :root {
+      --bg-primary: #0a0a1a;
+      --bg-secondary: #12122a;
+      --bg-card: #1a1a3e;
+      --bg-card-hover: #222255;
+      --accent-primary: #7c3aed;
+      --accent-secondary: #a855f7;
+      --accent-glow: rgba(124, 58, 237, 0.3);
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --info: #3b82f6;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --border: rgba(148, 163, 184, 0.1);
+      --radius: 16px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ─── Background Effect ────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(ellipse at 30% 20%, rgba(124, 58, 237, 0.08) 0%, transparent 50%),
+                  radial-gradient(ellipse at 70% 80%, rgba(168, 85, 247, 0.06) 0%, transparent 50%),
+                  radial-gradient(ellipse at 50% 50%, rgba(59, 130, 246, 0.04) 0%, transparent 50%);
+      z-index: -1;
+      animation: bgShift 20s ease-in-out infinite alternate;
+    }
+
+    @keyframes bgShift {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(-5%, -3%) scale(1.05); }
+    }
+
+    /* ─── Header ───────────────────────────────────────────── */
+    .header {
+      background: rgba(18, 18, 42, 0.8);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header h1 {
+      font-size: 1.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary), #ec4899);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+    }
+
+    .header-info {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .coin-badge {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #000;
+      padding: 6px 16px;
+      border-radius: 24px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .user-badge {
+      background: var(--bg-card);
+      padding: 6px 16px;
+      border-radius: 24px;
+      font-size: 0.85rem;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    .role-admin { color: var(--accent-secondary); font-weight: 600; }
+
+    /* ─── Layout ───────────────────────────────────────────── */
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 340px 1fr 340px;
+      gap: 24px;
+      min-height: calc(100vh - 72px);
+    }
+
+    @media (max-width: 1200px) {
+      .container { grid-template-columns: 1fr; }
+    }
+
+    /* ─── Cards ─────────────────────────────────────────────── */
+    .card {
+      background: rgba(26, 26, 62, 0.6);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      transition: all 0.3s ease;
+    }
+
+    .card:hover {
+      border-color: rgba(124, 58, 237, 0.2);
+      box-shadow: 0 0 40px rgba(124, 58, 237, 0.05);
+    }
+
+    .card-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ─── Auth Section ─────────────────────────────────────── */
+    #auth-section {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .auth-card {
+      background: rgba(26, 26, 62, 0.8);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 48px;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
+    }
+
+    .auth-card h2 {
+      font-size: 1.8rem;
+      font-weight: 800;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .auth-card p {
+      color: var(--text-muted);
+      margin-bottom: 32px;
+      font-size: 0.9rem;
+    }
+
+    .auth-tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-primary);
+      padding: 4px;
+      border-radius: 12px;
+      margin-bottom: 28px;
+    }
+
+    .auth-tab {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+
+    .auth-tab.active {
+      background: var(--accent-primary);
+      color: white;
+    }
+
+    /* ─── Form Elements ────────────────────────────────────── */
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text-primary);
+      font-size: 0.9rem;
+      font-family: 'Inter', sans-serif;
+      transition: all 0.2s;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+    }
+
+    /* ─── Buttons ───────────────────────────────────────────── */
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      font-family: 'Inter', sans-serif;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      color: white;
+      box-shadow: 0 4px 20px rgba(124, 58, 237, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 30px rgba(124, 58, 237, 0.4);
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, #059669, var(--success));
+      color: white;
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, #dc2626, var(--danger));
+      color: white;
+    }
+
+    .btn-sm {
+      padding: 8px 16px;
+      font-size: 0.8rem;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* ─── Spin Wheel Visual ────────────────────────────────── */
+    .wheel-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .wheel-visual {
+      width: 320px;
+      height: 320px;
+      border-radius: 50%;
+      position: relative;
+      background: conic-gradient(
+        from 0deg,
+        #7c3aed, #a855f7, #ec4899, #f43f5e,
+        #f59e0b, #10b981, #3b82f6, #7c3aed
+      );
+      box-shadow: 0 0 60px rgba(124, 58, 237, 0.3),
+                  inset 0 0 60px rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .wheel-visual.spinning {
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .wheel-center {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: var(--bg-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      border: 4px solid var(--bg-secondary);
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+      z-index: 2;
+    }
+
+    .wheel-pointer {
+      position: absolute;
+      top: -12px;
+      width: 0;
+      height: 0;
+      border-left: 14px solid transparent;
+      border-right: 14px solid transparent;
+      border-top: 24px solid var(--accent-primary);
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+      z-index: 3;
+    }
+
+    /* Status Badge */
+    .status-badge {
+      padding: 6px 18px;
+      border-radius: 24px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .status-waiting { background: rgba(59, 130, 246, 0.15); color: var(--info); border: 1px solid rgba(59, 130, 246, 0.3); }
+    .status-spinning { background: rgba(245, 158, 11, 0.15); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.3); }
+    .status-completed { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); }
+    .status-aborted { background: rgba(239, 68, 68, 0.15); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); }
+
+    /* ─── Participants List ─────────────────────────────────── */
+    .participant-list {
+      list-style: none;
+    }
+
+    .participant-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-radius: 10px;
+      margin-bottom: 6px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid transparent;
+      transition: all 0.3s ease;
+    }
+
+    .participant-item.active {
+      border-color: rgba(16, 185, 129, 0.2);
+      background: rgba(16, 185, 129, 0.05);
+    }
+
+    .participant-item.eliminated {
+      opacity: 0.4;
+      text-decoration: line-through;
+      border-color: rgba(239, 68, 68, 0.1);
+    }
+
+    .participant-item.winner {
+      border-color: rgba(245, 158, 11, 0.4);
+      background: rgba(245, 158, 11, 0.1);
+      animation: winnerGlow 1.5s ease-in-out infinite alternate;
+    }
+
+    @keyframes winnerGlow {
+      from { box-shadow: 0 0 10px rgba(245, 158, 11, 0.1); }
+      to { box-shadow: 0 0 20px rgba(245, 158, 11, 0.3); }
+    }
+
+    .participant-name {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .participant-status {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 12px;
+    }
+
+    /* ─── Event Log ────────────────────────────────────────── */
+    .event-log {
+      max-height: 500px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--accent-primary) transparent;
+    }
+
+    .event-item {
+      padding: 10px 14px;
+      margin-bottom: 6px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      background: rgba(255, 255, 255, 0.02);
+      border-left: 3px solid var(--border);
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateX(-10px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .event-item.elimination { border-left-color: var(--danger); }
+    .event-item.join { border-left-color: var(--success); }
+    .event-item.system { border-left-color: var(--info); }
+    .event-item.winner { border-left-color: var(--warning); }
+
+    .event-time {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* ─── Pool Stats ───────────────────────────────────────── */
+    .pool-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .pool-stat {
+      text-align: center;
+      padding: 14px 8px;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+
+    .pool-stat .pool-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+
+    .pool-stat .pool-value {
+      font-size: 1.2rem;
+      font-weight: 800;
+    }
+
+    .pool-winner .pool-value { color: var(--success); }
+    .pool-admin .pool-value { color: var(--accent-secondary); }
+    .pool-app .pool-value { color: var(--info); }
+
+    /* ─── Admin Controls ───────────────────────────────────── */
+    .admin-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .admin-controls .btn { width: 100%; }
+
+    /* ─── Quick Login ──────────────────────────────────────── */
+    .quick-login {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .quick-login h4 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .quick-login-btns {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .quick-login-btns .btn {
+      width: auto;
+      flex: 1;
+      min-width: 80px;
+      padding: 8px 12px;
+      font-size: 0.75rem;
+    }
+
+    /* ─── Wheel Info Bar ───────────────────────────────────── */
+    .wheel-info-bar {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .info-chip {
+      background: var(--bg-card);
+      padding: 8px 18px;
+      border-radius: 24px;
+      font-size: 0.8rem;
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .info-chip strong {
+      color: var(--accent-secondary);
+    }
+
+    /* ─── Hidden ────────────────────────────────────────────── */
+    .hidden { display: none !important; }
+
+    /* ─── Scrollbar ─────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--accent-primary); border-radius: 3px; }
+
+    /* ─── Toast Notifications ──────────────────────────────── */
+    .toast-container {
+      position: fixed;
+      top: 80px;
+      right: 24px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .toast {
+      padding: 14px 20px;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      backdrop-filter: blur(12px);
+      animation: slideIn 0.3s ease, fadeOut 0.3s ease 3.7s forwards;
+      max-width: 380px;
+      border: 1px solid;
+    }
+
+    .toast-success { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); color: var(--success); }
+    .toast-error { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: var(--danger); }
+    .toast-info { background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.3); color: var(--info); }
+    .toast-warning { background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.3); color: var(--warning); }
+
+    @keyframes slideIn {
+      from { transform: translateX(100px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- ═══ AUTH SECTION ═══════════════════════════════════════ -->
+  <div id="auth-section">
+    <div class="auth-card">
+      <h2>🎡 Spin Wheel</h2>
+      <p>Sign in to play or create spin wheels</p>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" onclick="showAuthTab('login')">Login</button>
+        <button class="auth-tab" onclick="showAuthTab('register')">Register</button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="login-form" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="login-email" placeholder="Enter your email" required>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="login-password" placeholder="Enter your password" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Sign In</button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="register-form" class="hidden" onsubmit="handleRegister(event)">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="reg-username" placeholder="Choose a username" required>
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="reg-email" placeholder="Enter your email" required>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="reg-password" placeholder="Create a password" required>
+        </div>
+        <div class="form-group">
+          <label>Role</label>
+          <select id="reg-role">
+            <option value="user">Player</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Create Account</button>
+      </form>
+
+      <!-- Quick Login -->
+      <div class="quick-login">
+        <h4>⚡ Quick Login (Test Accounts)</h4>
+        <div class="quick-login-btns">
+          <button class="btn btn-primary btn-sm" onclick="quickLogin('admin@roxstar.com', 'admin123')">Admin</button>
+          <button class="btn btn-success btn-sm" onclick="quickLogin('player1@test.com', 'password123')">P1</button>
+          <button class="btn btn-success btn-sm" onclick="quickLogin('player2@test.com', 'password123')">P2</button>
+          <button class="btn btn-success btn-sm" onclick="quickLogin('player3@test.com', 'password123')">P3</button>
+          <button class="btn btn-success btn-sm" onclick="quickLogin('player4@test.com', 'password123')">P4</button>
+          <button class="btn btn-success btn-sm" onclick="quickLogin('player5@test.com', 'password123')">P5</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ GAME SECTION ══════════════════════════════════════ -->
+  <div id="game-section" class="hidden">
+    <div class="header">
+      <h1>🎡 Roxstar Spin Wheel</h1>
+      <div class="header-info">
+        <span class="coin-badge">🪙 <span id="user-coins">0</span></span>
+        <span class="user-badge" id="user-badge">-</span>
+        <button class="btn btn-danger btn-sm" onclick="logout()" style="width:auto">Logout</button>
+      </div>
+    </div>
+
+    <div class="container">
+      <!-- ═══ LEFT: Participants ═══ -->
+      <div>
+        <div class="card">
+          <div class="card-title">👥 Participants</div>
+          <ul class="participant-list" id="participants-list">
+            <li style="color:var(--text-muted);font-size:0.85rem;padding:12px">No active wheel</li>
+          </ul>
+        </div>
+
+        <!-- Admin Controls -->
+        <div class="card" id="admin-panel" style="margin-top:16px">
+          <div class="card-title">⚙️ Admin Controls</div>
+          <div class="admin-controls">
+            <div class="form-group" style="margin-bottom:8px">
+              <label>Entry Fee</label>
+              <input type="number" id="entry-fee-input" value="100" min="1">
+            </div>
+            <button class="btn btn-primary" id="btn-create-wheel" onclick="createWheel()">🎡 Create Wheel</button>
+            <button class="btn btn-success" id="btn-start-wheel" onclick="startWheel()" disabled>▶️ Start Wheel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ CENTER: Wheel ═══ -->
+      <div class="wheel-container">
+        <div class="wheel-info-bar">
+          <div class="info-chip">Status: <strong id="wheel-status">No Wheel</strong></div>
+          <div class="info-chip">Fee: <strong id="wheel-fee">-</strong></div>
+          <div class="info-chip">Players: <strong id="wheel-player-count">0</strong></div>
+        </div>
+
+        <div style="position:relative">
+          <div class="wheel-pointer"></div>
+          <div class="wheel-visual" id="wheel-visual">
+            <div class="wheel-center" id="wheel-center">🎡</div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="btn-join-wheel" onclick="joinWheel()" style="max-width:300px" disabled>
+          🎟️ Join Wheel
+        </button>
+
+        <!-- Pool Stats -->
+        <div class="pool-stats" id="pool-stats">
+          <div class="pool-stat pool-winner">
+            <div class="pool-label">Winner Pool</div>
+            <div class="pool-value" id="pool-winner">0</div>
+          </div>
+          <div class="pool-stat pool-admin">
+            <div class="pool-label">Admin Pool</div>
+            <div class="pool-value" id="pool-admin">0</div>
+          </div>
+          <div class="pool-stat pool-app">
+            <div class="pool-label">App Pool</div>
+            <div class="pool-value" id="pool-app">0</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ RIGHT: Event Log ═══ -->
+      <div>
+        <div class="card">
+          <div class="card-title">📋 Event Log</div>
+          <div class="event-log" id="event-log">
+            <div class="event-item system">
+              <div>Welcome! Connect to start playing.</div>
+              <div class="event-time">System</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ─── State ─────────────────────────────────────────────────
+    let socket = null;
+    let currentUser = null;
+    let authToken = null;
+    let activeWheel = null;
+
+    const API = '';
+
+    // ─── Auth Functions ────────────────────────────────────────
+    function showAuthTab(tab) {
+      document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+      event.target.classList.add('active');
+      document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
+      document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+      await loginUser(email, password);
+    }
+
+    async function handleRegister(e) {
+      e.preventDefault();
+      try {
+        const res = await fetch(`${API}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: document.getElementById('reg-username').value,
+            email: document.getElementById('reg-email').value,
+            password: document.getElementById('reg-password').value,
+            role: document.getElementById('reg-role').value,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        showToast('Account created! Logging in...', 'success');
+        setSession(data.user, data.token);
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function loginUser(email, password) {
+      try {
+        const res = await fetch(`${API}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        setSession(data.user, data.token);
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function quickLogin(email, password) {
+      document.getElementById('login-email').value = email;
+      document.getElementById('login-password').value = password;
+      loginUser(email, password);
+    }
+
+    function setSession(user, token) {
+      currentUser = user;
+      authToken = token;
+      document.getElementById('auth-section').classList.add('hidden');
+      document.getElementById('game-section').classList.remove('hidden');
+      document.getElementById('user-coins').textContent = user.coins;
+      document.getElementById('user-badge').textContent = `${user.username} (${user.role})`;
+      document.getElementById('user-badge').classList.toggle('role-admin', user.role === 'admin');
+
+      // Show/hide admin panel
+      document.getElementById('admin-panel').classList.toggle('hidden', user.role !== 'admin');
+
+      connectSocket();
+      addEvent('Logged in as ' + user.username, 'system');
+    }
+
+    function logout() {
+      if (socket) socket.disconnect();
+      currentUser = null;
+      authToken = null;
+      activeWheel = null;
+      document.getElementById('auth-section').classList.remove('hidden');
+      document.getElementById('game-section').classList.add('hidden');
+    }
+
+    // ─── Socket Connection ─────────────────────────────────────
+    function connectSocket() {
+      socket = io({ auth: { token: authToken } });
+
+      socket.on('connect', () => {
+        addEvent('Connected to server', 'system');
+      });
+
+      socket.on('disconnect', () => {
+        addEvent('Disconnected from server', 'system');
+      });
+
+      // ─── Wheel Events ─────────────────────────────────────
+      socket.on('wheel:current-state', (data) => {
+        if (data.wheel) {
+          activeWheel = data.wheel;
+          updateWheelUI();
+        }
+      });
+
+      socket.on('wheel:created', (data) => {
+        activeWheel = data.wheel;
+        updateWheelUI();
+        addEvent(data.message, 'system');
+        showToast(data.message, 'info');
+      });
+
+      socket.on('wheel:user-joined', (data) => {
+        addEvent(data.message, 'join');
+        // Refresh wheel state
+        refreshWheel();
+      });
+
+      socket.on('wheel:started', (data) => {
+        activeWheel = data.wheel;
+        updateWheelUI();
+        addEvent(data.message, 'system');
+        showToast('🎰 Wheel is spinning!', 'warning');
+        document.getElementById('wheel-visual').classList.add('spinning');
+        document.getElementById('wheel-center').textContent = '🎰';
+      });
+
+      socket.on('wheel:elimination', (data) => {
+        addEvent(`💀 ${data.eliminated.username} eliminated! (${data.remainingCount} left)`, 'elimination');
+        showToast(`${data.eliminated.username} eliminated!`, 'error');
+        refreshWheel();
+      });
+
+      socket.on('wheel:completed', (data) => {
+        addEvent(`🏆 ${data.winner.username} WINS!`, 'winner');
+        showToast(`🏆 ${data.winner.username} wins the wheel!`, 'success');
+        document.getElementById('wheel-visual').classList.remove('spinning');
+        document.getElementById('wheel-center').textContent = '🏆';
+        refreshWheel();
+        refreshBalance();
+      });
+
+      socket.on('wheel:aborted', (data) => {
+        addEvent(data.message, 'system');
+        showToast(data.message, 'warning');
+        document.getElementById('wheel-visual').classList.remove('spinning');
+        document.getElementById('wheel-center').textContent = '❌';
+        activeWheel = null;
+        updateWheelUI();
+        refreshBalance();
+      });
+
+      socket.on('wheel:error', (data) => {
+        addEvent(`Error: ${data.message}`, 'system');
+        showToast(data.message, 'error');
+      });
+    }
+
+    // ─── Wheel Actions ─────────────────────────────────────────
+    function createWheel() {
+      const entryFee = parseInt(document.getElementById('entry-fee-input').value) || 100;
+      socket.emit('wheel:create', { entryFee }, (response) => {
+        if (response.error) {
+          showToast(response.error, 'error');
+        }
+      });
+    }
+
+    function joinWheel() {
+      if (!activeWheel) return;
+      socket.emit('wheel:join', { wheelId: activeWheel.id }, (response) => {
+        if (response.error) {
+          showToast(response.error, 'error');
+        } else {
+          showToast('Joined the wheel!', 'success');
+          refreshBalance();
+        }
+      });
+    }
+
+    function startWheel() {
+      if (!activeWheel) return;
+      socket.emit('wheel:start', { wheelId: activeWheel.id }, (response) => {
+        if (response.error) {
+          showToast(response.error, 'error');
+        }
+      });
+    }
+
+    // ─── UI Updates ────────────────────────────────────────────
+    function updateWheelUI() {
+      const statusEl = document.getElementById('wheel-status');
+      const feeEl = document.getElementById('wheel-fee');
+      const countEl = document.getElementById('wheel-player-count');
+      const joinBtn = document.getElementById('btn-join-wheel');
+      const startBtn = document.getElementById('btn-start-wheel');
+      const createBtn = document.getElementById('btn-create-wheel');
+
+      if (!activeWheel) {
+        statusEl.textContent = 'No Wheel';
+        feeEl.textContent = '-';
+        countEl.textContent = '0';
+        joinBtn.disabled = true;
+        startBtn.disabled = true;
+        createBtn.disabled = false;
+        document.getElementById('pool-winner').textContent = '0';
+        document.getElementById('pool-admin').textContent = '0';
+        document.getElementById('pool-app').textContent = '0';
+        document.getElementById('participants-list').innerHTML =
+          '<li style="color:var(--text-muted);font-size:0.85rem;padding:12px">No active wheel</li>';
+        document.getElementById('wheel-visual').classList.remove('spinning');
+        document.getElementById('wheel-center').textContent = '🎡';
+        return;
+      }
+
+      statusEl.textContent = activeWheel.status.toUpperCase();
+      feeEl.textContent = activeWheel.entryFee + ' 🪙';
+      countEl.textContent = activeWheel.participants?.length || 0;
+
+      // Pool stats
+      document.getElementById('pool-winner').textContent = Math.round(activeWheel.winnerPool || 0);
+      document.getElementById('pool-admin').textContent = Math.round(activeWheel.adminPool || 0);
+      document.getElementById('pool-app').textContent = Math.round(activeWheel.appPool || 0);
+
+      // Button states
+      const isWaiting = activeWheel.status === 'waiting';
+      const isParticipant = activeWheel.participants?.some(p => p.userId === currentUser?.id);
+      const isAdmin = currentUser?.role === 'admin' && activeWheel.adminId === currentUser?.id;
+
+      joinBtn.disabled = !isWaiting || isParticipant || currentUser?.role === 'admin';
+      startBtn.disabled = !isWaiting || !isAdmin;
+      createBtn.disabled = !!activeWheel && ['waiting', 'spinning'].includes(activeWheel.status);
+
+      if (activeWheel.status === 'spinning') {
+        document.getElementById('wheel-visual').classList.add('spinning');
+        document.getElementById('wheel-center').textContent = '🎰';
+      }
+
+      // Participants list
+      const list = document.getElementById('participants-list');
+      if (activeWheel.participants?.length) {
+        list.innerHTML = activeWheel.participants.map(p => `
+          <li class="participant-item ${p.status}">
+            <span class="participant-name">${p.status === 'winner' ? '🏆 ' : p.status === 'eliminated' ? '💀 ' : '🟢 '}${p.user.username}</span>
+            <span class="participant-status" style="background:${
+              p.status === 'active' ? 'rgba(16,185,129,0.15);color:var(--success)' :
+              p.status === 'eliminated' ? 'rgba(239,68,68,0.15);color:var(--danger)' :
+              'rgba(245,158,11,0.15);color:var(--warning)'
+            }">${p.status}</span>
+          </li>
+        `).join('');
+      } else {
+        list.innerHTML = '<li style="color:var(--text-muted);font-size:0.85rem;padding:12px">Waiting for players...</li>';
+      }
+    }
+
+    async function refreshWheel() {
+      if (!activeWheel || !authToken) return;
+      try {
+        const res = await fetch(`${API}/api/wheel/${activeWheel.id}`, {
+          headers: { 'Authorization': `Bearer ${authToken}` },
+        });
+        const data = await res.json();
+        if (data.wheel) {
+          activeWheel = data.wheel;
+          updateWheelUI();
+        }
+      } catch (err) {
+        // If wheel not found, check for a new active one
+        try {
+          const res2 = await fetch(`${API}/api/wheel/active`);
+          const data2 = await res2.json();
+          activeWheel = data2.wheel || null;
+          updateWheelUI();
+        } catch(e) {}
+      }
+    }
+
+    async function refreshBalance() {
+      if (!authToken) return;
+      try {
+        const res = await fetch(`${API}/api/user/balance`, {
+          headers: { 'Authorization': `Bearer ${authToken}` },
+        });
+        const data = await res.json();
+        document.getElementById('user-coins').textContent = Math.round(data.coins);
+      } catch (err) {}
+    }
+
+    // ─── Event Log ─────────────────────────────────────────────
+    function addEvent(message, type = 'system') {
+      const log = document.getElementById('event-log');
+      const time = new Date().toLocaleTimeString();
+      const item = document.createElement('div');
+      item.className = `event-item ${type}`;
+      item.innerHTML = `<div>${message}</div><div class="event-time">${time}</div>`;
+      log.insertBefore(item, log.firstChild);
+      // Keep max 50 events
+      while (log.children.length > 50) log.removeChild(log.lastChild);
+    }
+
+    // ─── Toast Notifications ───────────────────────────────────
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 4000);
+    }
+  </script>
+</body>
+</html>
