@@ -137,3 +137,48 @@ The `npm run setup` command automatically seeds the database with initial settin
 - **Database-Driven AppConfig Cache**: Distribution percentages are kept in memory cache to avoid hitting the database on every join operation, refreshing only when admins explicitly update configurations.
 - **WebSocket Rooms**: Created dedicated rooms for spectators and players so state updates are routed efficiently without flooding unrelated network pipelines.
 - **Pessimistic Decrements**: Increments and decrements use relative prisma actions (`coins: { decrement: fee }`) rather than absolute reads/writes to safeguard against write conflicts.
+
+---
+
+## 🌐 Production & Vercel Deployment Guide
+
+We have fully pre-configured this project for **Vercel** via `vercel.json` routing and build scripts. However, due to the real-time nature of WebSocket multiplayer games, there are important architectural considerations to keep in mind:
+
+### 1. Serverless Environments (Vercel) Limitations
+- **Stateless/Ephemeral Execution**: Vercel functions boot up and shut down on demand. They **cannot maintain active timers** in-memory (such as the 3-minute lobby countdown or the 7-second elimination interval loops).
+- **Transient WebSocket Connections**: Standard WebSockets require a persistent stateful connection. In serverless environments, Socket.IO automatically falls back to HTTP Long Polling, which might experience packet loss without sticky sessions.
+- **Ephemeral SQLite Storage**: SQLite stores data in a local file. On Vercel, this file resets on every function invocation.
+
+### 2. Best Alternative: Stateful Persistent Hosting (Highly Recommended)
+For real-time multiplayer systems, **persistent servers** are highly superior. We recommend:
+- **Render.com** (Web Service + Managed PostgreSQL / Disk Storage)
+- **Railway.app** (TypeScript Service + Managed Database)
+- **DigitalOcean App Platform** or **Heroku**
+
+These environments run the application continuously as a persistent Node.js process, allowing SQLite, timers, and active websocket channels to run flawlessly out of the box with zero external dependencies.
+
+---
+
+### 3. How to Deploy on Vercel with Managed Database (PostgreSQL)
+If you still choose to deploy on Vercel, you should swap SQLite for a managed cloud database (like **Neon.tech** or **Supabase**):
+
+#### Step A: Swap Database Provider in Prisma (`prisma/schema.prisma`)
+Modify the datasource provider in the Prisma schema file from `sqlite` to `postgresql`:
+```prisma
+// prisma/schema.prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+```
+
+#### Step B: Add Environment Variables in Vercel Dashboard
+In your Vercel Project settings, define the following variables:
+- `DATABASE_URL`: Your cloud PostgreSQL connection string (`postgres://...`)
+- `JWT_SECRET`: A secure random secret string
+- `PORT`: `3000` (optional)
+- Plus any optional default configurations like `DEFAULT_ENTRY_FEE` or `ELIMINATION_INTERVAL_MS`.
+
+#### Step C: Run Vercel Deploy
+Once the environment variables are set, Vercel will automatically run the `build` script (`npx prisma generate`) and deploy the serverless functions!
+

@@ -12,7 +12,9 @@
     "db:migrate": "npx prisma migrate dev",
     "db:seed": "tsx src/seed.ts",
     "db:reset": "npx prisma db push --force-reset && tsx src/seed.ts",
-    "setup": "npm run db:push && npm run db:generate && npm run db:seed"
+    "setup": "npm run db:push && npm run db:generate && npm run db:seed",
+    "build": "npx prisma generate",
+    "postinstall": "npx prisma generate"
   },
   "keywords": ["spin-wheel", "real-time", "multiplayer", "game"],
   "author": "",
