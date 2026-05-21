@@ -60,7 +60,7 @@ app.get("/api/health", (_req, res) => {
 });
 
 // ─── Serve frontend for all non-API routes ────────────────────────────────────
-app.get("*", (_req, res) => {
+app.use((_req, res) => {
   res.sendFile(path.join(__dirname, "../public/index.html"));
 });
 
