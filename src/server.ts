@@ -126,6 +126,6 @@ if (!process.env.VERCEL) {
 // Start DB & Socket initialization
 startServer();
 
-// Export httpServer as default for Vercel serverless function entry mapping
-export default httpServer;
+// Export Express app as default for Vercel serverless function entry mapping
+export default app;
 
