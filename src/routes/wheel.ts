@@ -31,7 +31,7 @@ router.post("/create", authenticate, requireAdmin, async (req: AuthRequest, res)
  */
 router.post("/:id/join", authenticate, async (req: AuthRequest, res) => {
   try {
-    const result = await WheelService.joinWheel(req.user!.id, req.params.id!);
+    const result = await WheelService.joinWheel(req.user!.id, req.params.id as string);
 
     res.json({
       message: "Successfully joined the spin wheel.",
@@ -53,7 +53,7 @@ router.post("/:id/join", authenticate, async (req: AuthRequest, res) => {
  */
 router.post("/:id/start", authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const result = await WheelService.startWheel(req.params.id!, req.user!.id);
+    const result = await WheelService.startWheel(req.params.id as string, req.user!.id);
 
     res.json({
       message: "Spin wheel started! Eliminations will begin.",
@@ -88,7 +88,7 @@ router.get("/active", async (_req, res) => {
  */
 router.get("/:id", authenticate, async (req: AuthRequest, res) => {
   try {
-    const wheel = await WheelService.getWheelById(req.params.id!);
+    const wheel = await WheelService.getWheelById(req.params.id as string);
     res.json({ wheel });
   } catch (error: any) {
     res.status(404).json({ error: "Spin wheel not found." });

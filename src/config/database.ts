@@ -1,4 +1,4 @@
-import { PrismaClient } from "../../generated/prisma/client.js";
+import { PrismaClient } from "@prisma/client";
 
 // Singleton Prisma client to prevent multiple connections
 const globalForPrisma = globalThis as unknown as {
