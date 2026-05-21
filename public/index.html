@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🎡 Roxstar Spin Wheel</title>
-  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
@@ -842,6 +842,13 @@
 
     // ─── Socket Connection ─────────────────────────────────────
     function connectSocket() {
+      if (typeof io === 'undefined') {
+        const errorMsg = 'Socket.IO library is not loaded. If you are on Vercel, WebSockets are not supported in serverless functions. Please run the project locally!';
+        addEvent(errorMsg, 'system');
+        showToast('WebSockets are unsupported on Vercel. Please run locally!', 'error');
+        return;
+      }
+
       socket = io({ auth: { token: authToken } });
 
       socket.on('connect', () => {
@@ -850,6 +857,11 @@
 
       socket.on('disconnect', () => {
         addEvent('Disconnected from server', 'system');
+      });
+
+      socket.on('connect_error', (err) => {
+        console.error('Socket connection error:', err);
+        addEvent('Failed to connect to real-time server', 'system');
       });
 
       // ─── Wheel Events ─────────────────────────────────────
@@ -915,6 +927,10 @@
 
     // ─── Wheel Actions ─────────────────────────────────────────
     function createWheel() {
+      if (!socket || !socket.connected) {
+        showToast('Not connected to the game server. Run the project locally for the multiplayer game experience!', 'error');
+        return;
+      }
       const entryFee = parseInt(document.getElementById('entry-fee-input').value) || 100;
       socket.emit('wheel:create', { entryFee }, (response) => {
         if (response.error) {
@@ -925,6 +941,10 @@
 
     function joinWheel() {
       if (!activeWheel) return;
+      if (!socket || !socket.connected) {
+        showToast('Not connected to the game server. Run the project locally to join!', 'error');
+        return;
+      }
       socket.emit('wheel:join', { wheelId: activeWheel.id }, (response) => {
         if (response.error) {
           showToast(response.error, 'error');
@@ -937,6 +957,10 @@
 
     function startWheel() {
       if (!activeWheel) return;
+      if (!socket || !socket.connected) {
+        showToast('Not connected to the game server. Run the project locally to start!', 'error');
+        return;
+      }
       socket.emit('wheel:start', { wheelId: activeWheel.id }, (response) => {
         if (response.error) {
           showToast(response.error, 'error');
