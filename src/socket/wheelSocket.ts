@@ -80,6 +80,9 @@ export function initializeSocket(io: SocketServer): void {
 
         const wheel = await WheelService.createWheel(user.id, data?.entryFee);
 
+        // Join the wheel-specific room
+        socket.join(`wheel:${wheel.id}`);
+
         // Notify all clients
         io.to("spin-wheel-lobby").emit("wheel:created", {
           wheel,

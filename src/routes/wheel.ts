@@ -83,19 +83,6 @@ router.get("/active", async (_req, res) => {
 });
 
 /**
- * GET /api/wheel/:id
- * Get details of a specific spin wheel.
- */
-router.get("/:id", authenticate, async (req: AuthRequest, res) => {
-  try {
-    const wheel = await WheelService.getWheelById(req.params.id as string);
-    res.json({ wheel });
-  } catch (error: any) {
-    res.status(404).json({ error: "Spin wheel not found." });
-  }
-});
-
-/**
  * GET /api/wheel/history/list
  * Get completed/aborted wheel history.
  */
@@ -161,6 +148,19 @@ router.put("/config/update", authenticate, requireAdmin, async (req: AuthRequest
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/wheel/:id
+ * Get details of a specific spin wheel. Public access allowed for spectators.
+ */
+router.get("/:id", async (req, res) => {
+  try {
+    const wheel = await WheelService.getWheelById(req.params.id as string);
+    res.json({ wheel });
+  } catch (error: any) {
+    res.status(404).json({ error: "Spin wheel not found." });
   }
 });
 

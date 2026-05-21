@@ -895,10 +895,8 @@
 
       // ─── Wheel Events ─────────────────────────────────────
       socket.on('wheel:current-state', (data) => {
-        if (data.wheel) {
-          activeWheel = data.wheel;
-          updateWheelUI();
-        }
+        activeWheel = data.wheel || null;
+        updateWheelUI();
       });
 
       socket.on('wheel:created', (data) => {
@@ -1023,9 +1021,11 @@
         return;
       }
 
-      statusEl.textContent = activeWheel.status.toUpperCase();
-      feeEl.textContent = activeWheel.entryFee + ' 🪙';
-      countEl.textContent = activeWheel.participants?.length || 0;
+      statusEl.textContent = (activeWheel.status || 'waiting').toUpperCase();
+      feeEl.textContent = (activeWheel.entryFee || 0) + ' 🪙';
+      
+      const participants = activeWheel.participants || [];
+      countEl.textContent = participants.length;
 
       // Pool stats
       document.getElementById('pool-winner').textContent = Math.round(activeWheel.winnerPool || 0);
@@ -1034,7 +1034,7 @@
 
       // Button states
       const isWaiting = activeWheel.status === 'waiting';
-      const isParticipant = activeWheel.participants?.some(p => p.userId === currentUser?.id);
+      const isParticipant = participants.some(p => p.userId === currentUser?.id);
       const isAdmin = currentUser?.role === 'admin' && activeWheel.adminId === currentUser?.id;
 
       joinBtn.disabled = !isWaiting || isParticipant || currentUser?.role === 'admin';
@@ -1048,10 +1048,10 @@
 
       // Participants list
       const list = document.getElementById('participants-list');
-      if (activeWheel.participants?.length) {
-        list.innerHTML = activeWheel.participants.map(p => `
+      if (participants.length) {
+        list.innerHTML = participants.map(p => `
           <li class="participant-item ${p.status}">
-            <span class="participant-name">${p.status === 'winner' ? '🏆 ' : p.status === 'eliminated' ? '💀 ' : '🟢 '}${p.user.username}</span>
+            <span class="participant-name">${p.status === 'winner' ? '🏆 ' : p.status === 'eliminated' ? '💀 ' : '🟢 '}${p.user?.username || 'Unknown'}</span>
             <span class="participant-status" style="background:${
               p.status === 'active' ? 'rgba(16,185,129,0.15);color:var(--success)' :
               p.status === 'eliminated' ? 'rgba(239,68,68,0.15);color:var(--danger)' :
@@ -1065,10 +1065,14 @@
     }
 
     async function refreshWheel() {
-      if (!activeWheel || !authToken) return;
+      if (!activeWheel) return;
       try {
+        const headers = {};
+        if (authToken) {
+          headers['Authorization'] = `Bearer ${authToken}`;
+        }
         const res = await fetch(`${API}/api/wheel/${activeWheel.id}`, {
-          headers: { 'Authorization': `Bearer ${authToken}` },
+          headers: headers,
         });
         const data = await res.json();
         if (data.wheel) {
