@@ -4,14 +4,17 @@ import { PrismaClient } from "@prisma/client";
 function fixDatabaseUrl(url: string | undefined): string | undefined {
   if (!url) return url;
   try {
-    const match = url.match(/^(postgres(?:ql)?:\/\/)([^:]+):(.*)$/);
-    if (!match) return url;
+    // Strip leading and trailing quotes if any
+    const cleanUrl = url.trim().replace(/^['"]|['"]$/g, '');
+    
+    const match = cleanUrl.match(/^(postgres(?:ql)?:\/\/)([^:]+):(.*)$/);
+    if (!match) return cleanUrl;
     
     const [_, protocol, username, passwordAndHost] = match;
-    if (!passwordAndHost) return url;
+    if (!passwordAndHost) return cleanUrl;
     
     const lastAtIndex = passwordAndHost.lastIndexOf('@');
-    if (lastAtIndex === -1) return url;
+    if (lastAtIndex === -1) return cleanUrl;
     
     const rawPassword = passwordAndHost.substring(0, lastAtIndex);
     const hostAndDb = passwordAndHost.substring(lastAtIndex + 1);
