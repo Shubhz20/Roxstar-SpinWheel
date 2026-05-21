@@ -124,7 +124,12 @@ if (!process.env.VERCEL) {
 }
 
 // Start DB & Socket initialization
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+} else {
+  // On Vercel, initialize config in the background
+  loadConfig().catch(console.error);
+}
 
 // Export Express app as default for Vercel serverless function entry mapping
 export default app;
