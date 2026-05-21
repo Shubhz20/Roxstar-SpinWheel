@@ -849,7 +849,7 @@
         return;
       }
 
-      socket = io({ auth: { token: authToken } });
+      socket = io(API || undefined, { auth: { token: authToken } });
 
       socket.on('connect', () => {
         addEvent('Connected to server', 'system');
