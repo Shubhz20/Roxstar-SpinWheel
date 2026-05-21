@@ -754,15 +754,23 @@
     let currentUser = null;
     let authToken = null;
     let activeWheel = null;
+    let isAuthLoading = false;
 
     const API = '';
 
     // ─── Auth Functions ────────────────────────────────────────
     function showAuthTab(tab) {
+      if (isAuthLoading) return;
       document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
       event.target.classList.add('active');
       document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
       document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
+    }
+
+    function setAuthButtonsDisabled(disabled) {
+      document.querySelectorAll('#auth-section button, #auth-section input, #auth-section select').forEach(el => {
+        el.disabled = disabled;
+      });
     }
 
     async function handleLogin(e) {
@@ -774,6 +782,9 @@
 
     async function handleRegister(e) {
       e.preventDefault();
+      if (isAuthLoading) return;
+      isAuthLoading = true;
+      setAuthButtonsDisabled(true);
       try {
         const res = await fetch(`${API}/api/auth/register`, {
           method: 'POST',
@@ -791,10 +802,15 @@
         setSession(data.user, data.token);
       } catch (err) {
         showToast(err.message, 'error');
+        setAuthButtonsDisabled(false);
+        isAuthLoading = false;
       }
     }
 
     async function loginUser(email, password) {
+      if (isAuthLoading) return;
+      isAuthLoading = true;
+      setAuthButtonsDisabled(true);
       try {
         const res = await fetch(`${API}/api/auth/login`, {
           method: 'POST',
@@ -806,10 +822,13 @@
         setSession(data.user, data.token);
       } catch (err) {
         showToast(err.message, 'error');
+        setAuthButtonsDisabled(false);
+        isAuthLoading = false;
       }
     }
 
     function quickLogin(email, password) {
+      if (isAuthLoading) return;
       document.getElementById('login-email').value = email;
       document.getElementById('login-password').value = password;
       loginUser(email, password);
@@ -836,6 +855,8 @@
       currentUser = null;
       authToken = null;
       activeWheel = null;
+      isAuthLoading = false;
+      setAuthButtonsDisabled(false);
       document.getElementById('auth-section').classList.remove('hidden');
       document.getElementById('game-section').classList.add('hidden');
     }
