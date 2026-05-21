@@ -2,7 +2,7 @@
 // Uses SQLite for development, can be swapped for PostgreSQL in production
 
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../generated/prisma"
 }
 

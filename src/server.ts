@@ -79,8 +79,10 @@ async function startServer(): Promise<void> {
     // Initialize Socket.IO handlers
     initializeSocket(io);
 
-    httpServer.listen(PORT, () => {
-      console.log(`
+    // Only listen on a port if not running in a serverless Vercel environment
+    if (!process.env.VERCEL) {
+      httpServer.listen(PORT, () => {
+        console.log(`
 ╔══════════════════════════════════════════════════╗
 ║        🎡 ROXSTAR SPIN WHEEL GAME SERVER         ║
 ╠══════════════════════════════════════════════════╣
@@ -89,29 +91,41 @@ async function startServer(): Promise<void> {
 ║  WebSocket: ws://localhost:${PORT}                  ║
 ║  Health:    http://localhost:${PORT}/api/health       ║
 ╚══════════════════════════════════════════════════╝
-      `);
-    });
+        `);
+      });
+    } else {
+      console.log("⚡ Running in Vercel Serverless environment. Port listening bypassed.");
+    }
   } catch (error) {
     console.error("❌ Failed to start server:", error);
-    process.exit(1);
+    if (!process.env.VERCEL) {
+      process.exit(1);
+    }
   }
 }
 
 // ─── Graceful Shutdown ────────────────────────────────────────────────────────
-process.on("SIGINT", async () => {
-  console.log("\n🛑 Shutting down gracefully...");
-  await prisma.$disconnect();
-  io.close();
-  httpServer.close();
-  process.exit(0);
-});
+if (!process.env.VERCEL) {
+  process.on("SIGINT", async () => {
+    console.log("\n🛑 Shutting down gracefully...");
+    await prisma.$disconnect();
+    io.close();
+    httpServer.close();
+    process.exit(0);
+  });
 
-process.on("SIGTERM", async () => {
-  console.log("\n🛑 Shutting down gracefully...");
-  await prisma.$disconnect();
-  io.close();
-  httpServer.close();
-  process.exit(0);
-});
+  process.on("SIGTERM", async () => {
+    console.log("\n🛑 Shutting down gracefully...");
+    await prisma.$disconnect();
+    io.close();
+    httpServer.close();
+    process.exit(0);
+  });
+}
 
+// Start DB & Socket initialization
 startServer();
+
+// Export httpServer as default for Vercel serverless function entry mapping
+export default httpServer;
+
