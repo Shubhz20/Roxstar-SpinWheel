@@ -6,7 +6,7 @@
   "main": "src/server.ts",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "prisma generate && prisma db push --skip-generate",
+    "build": "prisma generate && prisma db push --skip-generate && tsx src/seed.ts",
     "start": "node dist/server.js",
     "db:generate": "npx prisma generate",
     "db:push": "npx prisma db push",
