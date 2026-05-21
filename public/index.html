@@ -755,6 +755,9 @@
     let authToken = null;
     let activeWheel = null;
     let isAuthLoading = false;
+    let pollingInterval = null;
+    let lastWheelStatus = null;
+    let lastParticipants = [];
 
     const API = '';
 
@@ -839,7 +842,7 @@
       authToken = token;
       document.getElementById('auth-section').classList.add('hidden');
       document.getElementById('game-section').classList.remove('hidden');
-      document.getElementById('user-coins').textContent = user.coins;
+      document.getElementById('user-coins').textContent = Math.round(user.coins);
       document.getElementById('user-badge').textContent = `${user.username} (${user.role})`;
       document.getElementById('user-badge').classList.toggle('role-admin', user.role === 'admin');
 
@@ -847,11 +850,13 @@
       document.getElementById('admin-panel').classList.toggle('hidden', user.role !== 'admin');
 
       connectSocket();
+      startPolling();
       addEvent('Logged in as ' + user.username, 'system');
     }
 
     function logout() {
       if (socket) socket.disconnect();
+      stopPolling();
       currentUser = null;
       authToken = null;
       activeWheel = null;
@@ -859,6 +864,110 @@
       setAuthButtonsDisabled(false);
       document.getElementById('auth-section').classList.remove('hidden');
       document.getElementById('game-section').classList.add('hidden');
+    }
+
+    // ─── Polling System (Serverless Fallback) ───────────────────
+    function startPolling() {
+      if (pollingInterval) return;
+      console.log('🔄 Fallback HTTP polling loop started');
+      pollGameState();
+      pollingInterval = setInterval(async () => {
+        if (socket && socket.connected) {
+          return;
+        }
+        await pollGameState();
+      }, 2000);
+    }
+
+    function stopPolling() {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+      }
+    }
+
+    async function pollGameState() {
+      try {
+        const res = await fetch(`${API}/api/wheel/active`);
+        const data = await res.json();
+        
+        const wheel = data.wheel;
+        if (!wheel) {
+          if (activeWheel) {
+            if (activeWheel.status === 'spinning' || activeWheel.status === 'waiting') {
+              addEvent('Active wheel was ended or aborted.', 'system');
+            }
+          }
+          activeWheel = null;
+          lastWheelStatus = null;
+          lastParticipants = [];
+          updateWheelUI();
+          return;
+        }
+
+        const headers = {};
+        if (authToken) {
+          headers['Authorization'] = `Bearer ${authToken}`;
+        }
+        const resDetails = await fetch(`${API}/api/wheel/${wheel.id}`, { headers });
+        const dataDetails = await resDetails.json();
+        const fullWheel = dataDetails.wheel;
+
+        if (fullWheel) {
+          const currentP = fullWheel.participants || [];
+
+          if (lastWheelStatus !== fullWheel.status) {
+            if (fullWheel.status === 'spinning') {
+              addEvent('Wheel started! Eliminations beginning...', 'system');
+              showToast('🎰 Wheel is spinning!', 'warning');
+              document.getElementById('wheel-visual').classList.add('spinning');
+              document.getElementById('wheel-center').textContent = '🎰';
+            } else if (fullWheel.status === 'completed') {
+              const winner = currentP.find(p => p.status === 'winner');
+              const winnerName = winner?.user?.username || 'Someone';
+              addEvent(`🏆 ${winnerName} WINS!`, 'winner');
+              showToast(`🏆 ${winnerName} wins the wheel!`, 'success');
+              document.getElementById('wheel-visual').classList.remove('spinning');
+              document.getElementById('wheel-center').textContent = '🏆';
+              refreshBalance();
+            } else if (fullWheel.status === 'aborted') {
+              addEvent('Wheel aborted: insufficient participants.', 'system');
+              showToast('Wheel aborted!', 'warning');
+              document.getElementById('wheel-visual').classList.remove('spinning');
+              document.getElementById('wheel-center').textContent = '❌';
+              refreshBalance();
+            }
+            lastWheelStatus = fullWheel.status;
+          }
+
+          if (fullWheel.status === 'spinning' && lastParticipants.length > 0) {
+            const currentActiveIds = new Set(currentP.filter(p => p.status === 'active').map(p => p.userId));
+            const lastActiveParticipants = lastParticipants.filter(p => p.status === 'active');
+            
+            for (const lastP of lastActiveParticipants) {
+              if (!currentActiveIds.has(lastP.userId)) {
+                const username = lastP.user?.username || 'Someone';
+                addEvent(`💀 ${username} eliminated!`, 'elimination');
+                showToast(`${username} eliminated!`, 'error');
+              }
+            }
+          }
+
+          if (fullWheel.status === 'waiting' && lastParticipants.length > 0) {
+            for (const p of currentP) {
+              if (!lastParticipants.some(lp => lp.userId === p.userId)) {
+                addEvent(`${p.user?.username || 'A player'} joined the wheel!`, 'join');
+              }
+            }
+          }
+
+          lastParticipants = currentP;
+          activeWheel = fullWheel;
+          updateWheelUI();
+        }
+      } catch (err) {
+        console.error('Error polling game state:', err);
+      }
     }
 
     // ─── Socket Connection ─────────────────────────────────────
@@ -953,46 +1062,113 @@
     }
 
     // ─── Wheel Actions ─────────────────────────────────────────
-    function createWheel() {
-      if (!socket || !socket.connected) {
-        showToast('Not connected to the game server. Run the project locally for the multiplayer game experience!', 'error');
-        return;
-      }
+    async function createWheel() {
       const entryFee = parseInt(document.getElementById('entry-fee-input').value) || 100;
-      socket.emit('wheel:create', { entryFee }, (response) => {
-        if (response.error) {
-          showToast(response.error, 'error');
-        }
-      });
-    }
-
-    function joinWheel() {
-      if (!activeWheel) return;
-      if (!socket || !socket.connected) {
-        showToast('Not connected to the game server. Run the project locally to join!', 'error');
+      
+      if (socket && socket.connected) {
+        socket.emit('wheel:create', { entryFee }, (response) => {
+          if (response.error) {
+            showToast(response.error, 'error');
+          }
+        });
         return;
       }
-      socket.emit('wheel:join', { wheelId: activeWheel.id }, (response) => {
-        if (response.error) {
-          showToast(response.error, 'error');
-        } else {
-          showToast('Joined the wheel!', 'success');
-          refreshBalance();
-        }
-      });
-    }
 
-    function startWheel() {
-      if (!activeWheel) return;
-      if (!socket || !socket.connected) {
-        showToast('Not connected to the game server. Run the project locally to start!', 'error');
+      if (!authToken) {
+        showToast('You must be logged in to create a wheel.', 'error');
         return;
       }
-      socket.emit('wheel:start', { wheelId: activeWheel.id }, (response) => {
-        if (response.error) {
-          showToast(response.error, 'error');
-        }
-      });
+      try {
+        const res = await fetch(`${API}/api/wheel/create`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ entryFee })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to create wheel');
+        
+        activeWheel = data.wheel;
+        updateWheelUI();
+        showToast('New spin wheel created!', 'success');
+        addEvent(`New spin wheel created! Entry fee: ${activeWheel.entryFee} coins`, 'system');
+        
+        pollGameState();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function joinWheel() {
+      if (!activeWheel) return;
+      
+      if (socket && socket.connected) {
+        socket.emit('wheel:join', { wheelId: activeWheel.id }, (response) => {
+          if (response.error) {
+            showToast(response.error, 'error');
+          } else {
+            showToast('Joined the wheel!', 'success');
+            refreshBalance();
+          }
+        });
+        return;
+      }
+
+      if (!authToken) {
+        showToast('You must be logged in to join the wheel.', 'error');
+        return;
+      }
+      try {
+        const res = await fetch(`${API}/api/wheel/${activeWheel.id}/join`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to join wheel');
+        
+        showToast('Joined the wheel!', 'success');
+        refreshBalance();
+        pollGameState();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function startWheel() {
+      if (!activeWheel) return;
+      
+      if (socket && socket.connected) {
+        socket.emit('wheel:start', { wheelId: activeWheel.id }, (response) => {
+          if (response.error) {
+            showToast(response.error, 'error');
+          }
+        });
+        return;
+      }
+
+      if (!authToken) {
+        showToast('You must be logged in to start the wheel.', 'error');
+        return;
+      }
+      try {
+        const res = await fetch(`${API}/api/wheel/${activeWheel.id}/start`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to start wheel');
+        
+        showToast('🎰 Wheel is starting!', 'warning');
+        pollGameState();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
     }
 
     // ─── UI Updates ────────────────────────────────────────────

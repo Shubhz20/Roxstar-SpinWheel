@@ -363,10 +363,84 @@ export class WheelService {
   }
 
   /**
+   * For Vercel Serverless compatibility:
+   * Drive-by helper to progress auto-start/abort if enough time has passed.
+   */
+  static async checkAutoStartOrAbortIfTime(wheel: any): Promise<any> {
+    if (!wheel || wheel.status !== "waiting") {
+      return wheel;
+    }
+
+    const autoStartDelay = getConfigNumber("auto_start_delay_ms");
+    const createdTime = new Date(wheel.createdAt).getTime();
+    const now = Date.now();
+
+    if (now - createdTime >= autoStartDelay) {
+      console.log(`⏱️ Serverless drive-by auto-start/abort check for wheel ${wheel.id}`);
+      try {
+        const result = await WheelService.autoStartOrAbort(wheel.id);
+        
+        // Re-fetch wheel with relations
+        const updated = await prisma.spinWheel.findUnique({
+          where: { id: wheel.id },
+          include: {
+            participants: {
+              include: { user: { select: { id: true, username: true } } },
+            },
+            admin: { select: { id: true, username: true } },
+          },
+        });
+        return updated || wheel;
+      } catch (err) {
+        console.error("Error auto-starting/aborting wheel in drive-by:", err);
+      }
+    }
+    return wheel;
+  }
+
+  /**
+   * For Vercel Serverless compatibility:
+   * Drive-by helper to progress eliminations if enough time has passed.
+   */
+  static async progressSpinningWheelIfTime(wheel: any): Promise<any> {
+    if (!wheel || wheel.status !== "spinning") {
+      return wheel;
+    }
+
+    const interval = getConfigNumber("elimination_interval_ms");
+    const lastUpdate = new Date(wheel.updatedAt).getTime();
+    const now = Date.now();
+
+    if (now - lastUpdate >= interval) {
+      console.log(`💀 Serverless drive-by elimination check for wheel ${wheel.id}`);
+      try {
+        await WheelService.eliminateNext(wheel.id);
+        
+        // Re-fetch wheel with relations
+        const updated = await prisma.spinWheel.findUnique({
+          where: { id: wheel.id },
+          include: {
+            participants: {
+              include: { user: { select: { id: true, username: true } } },
+            },
+            admin: { select: { id: true, username: true } },
+          },
+        });
+        
+        // Recurse in case multiple intervals have passed since last request
+        return WheelService.progressSpinningWheelIfTime(updated || wheel);
+      } catch (err) {
+        console.error("Error progressing spinning wheel in drive-by:", err);
+      }
+    }
+    return wheel;
+  }
+
+  /**
    * Get the current active wheel with all details.
    */
   static async getActiveWheel(): Promise<any | null> {
-    return prisma.spinWheel.findFirst({
+    let wheel = await prisma.spinWheel.findFirst({
       where: {
         status: { in: ["waiting", "active", "spinning"] },
       },
@@ -378,13 +452,19 @@ export class WheelService {
       },
       orderBy: { createdAt: "desc" },
     });
+
+    if (wheel) {
+      wheel = await WheelService.checkAutoStartOrAbortIfTime(wheel);
+      wheel = await WheelService.progressSpinningWheelIfTime(wheel);
+    }
+    return wheel;
   }
 
   /**
    * Get wheel by ID with full details.
    */
   static async getWheelById(wheelId: string): Promise<any> {
-    return prisma.spinWheel.findUniqueOrThrow({
+    let wheel = await prisma.spinWheel.findUniqueOrThrow({
       where: { id: wheelId },
       include: {
         participants: {
@@ -397,6 +477,30 @@ export class WheelService {
         },
       },
     });
+
+    if (wheel && (wheel.status === "waiting" || wheel.status === "spinning")) {
+      const originalStatus = wheel.status;
+      wheel = await WheelService.checkAutoStartOrAbortIfTime(wheel);
+      wheel = await WheelService.progressSpinningWheelIfTime(wheel);
+      
+      // If status changed due to progression, re-fetch with full relations
+      if (wheel && wheel.status !== originalStatus) {
+        wheel = await prisma.spinWheel.findUniqueOrThrow({
+          where: { id: wheelId },
+          include: {
+            participants: {
+              include: { user: { select: { id: true, username: true } } },
+              orderBy: { joinedAt: "asc" },
+            },
+            admin: { select: { id: true, username: true } },
+            transactions: {
+              orderBy: { createdAt: "desc" },
+            },
+          },
+        });
+      }
+    }
+    return wheel;
   }
 
   /**
