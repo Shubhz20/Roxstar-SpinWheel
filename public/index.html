@@ -849,6 +849,14 @@
         return;
       }
 
+      // Check if we are on a serverless deployment (Vercel) without a custom backend API URL
+      const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+      if (!isLocalhost && !API) {
+        const warningMsg = '⚠️ Running on Vercel (Serverless). Real-time multiplayer features are disabled on Vercel directly. Please connect a persistent backend or run locally.';
+        addEvent(warningMsg, 'system');
+        return;
+      }
+
       socket = io(API || undefined, { auth: { token: authToken } });
 
       socket.on('connect', () => {
