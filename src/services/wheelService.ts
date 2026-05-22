@@ -456,6 +456,11 @@ export class WheelService {
     if (wheel) {
       wheel = await WheelService.checkAutoStartOrAbortIfTime(wheel);
       wheel = await WheelService.progressSpinningWheelIfTime(wheel);
+
+      // After drive-by progression, re-check if the wheel is still active
+      if (wheel && !["waiting", "active", "spinning"].includes(wheel.status)) {
+        return null;
+      }
     }
     return wheel;
   }

@@ -14,6 +14,7 @@
     "db:seed": "tsx src/seed.ts",
     "db:reset": "npx prisma db push --force-reset && tsx src/seed.ts",
     "setup": "npm run db:push && npm run db:generate && npm run db:seed",
+    "test": "tsx src/tests/critical_path.test.ts",
     "postinstall": "npx prisma generate"
   },
   "keywords": ["spin-wheel", "real-time", "multiplayer", "game"],
